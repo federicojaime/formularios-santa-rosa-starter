@@ -5,7 +5,7 @@ const FormDataContext = createContext();
 
 export const useFormData = () => useContext(FormDataContext);
 
-export const FormDataProvider = ({ children }) => {
+export const FormDataProvider = ({ children, initialShowDeleteModal = false }) => {
     // Estado para almacenar todos los formularios
     const [allForms, setAllForms] = useState(() => {
         const savedForms = localStorage.getItem('santaRosaForms');
@@ -21,6 +21,9 @@ export const FormDataProvider = ({ children }) => {
             datos: {}
         };
     });
+    
+    // Estado para controlar el modal de eliminación
+    const [showDeleteAllModal, setShowDeleteAllModal] = useState(initialShowDeleteModal);
 
     // Guardar formularios en localStorage cuando cambian
     useEffect(() => {
@@ -31,6 +34,13 @@ export const FormDataProvider = ({ children }) => {
     useEffect(() => {
         localStorage.setItem('currentForm', JSON.stringify(currentForm));
     }, [currentForm]);
+
+    // Asegurarse de que el modal se cierre si no hay formularios
+    useEffect(() => {
+        if (allForms.length === 0) {
+            setShowDeleteAllModal(false);
+        }
+    }, [allForms]);
 
     // Actualizar datos del formulario actual
     const updateCurrentForm = (data) => {
@@ -99,6 +109,7 @@ export const FormDataProvider = ({ children }) => {
     const deleteAllForms = () => {
         setAllForms([]);
         createNewForm();
+        setShowDeleteAllModal(false); // Cerrar el modal después de eliminar
     };
 
     const value = {
@@ -110,7 +121,9 @@ export const FormDataProvider = ({ children }) => {
         getFormById,
         loadForm,
         deleteForm,
-        deleteAllForms
+        deleteAllForms,
+        showDeleteAllModal,
+        setShowDeleteAllModal
     };
 
     return (

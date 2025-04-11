@@ -7,7 +7,6 @@ import {
   Button,
   Badge,
   TextInput,
-  Modal,
   Alert,
   Select,
   Avatar,
@@ -28,6 +27,38 @@ import {
 } from 'react-icons/hi';
 import { useFormData } from '../contexts/FormDataContext';
 import { motion, AnimatePresence } from 'framer-motion';
+import { createPortal } from 'react-dom';
+
+// Componente Modal personalizado para evitar problemas con Flowbite
+function CustomModal({ isOpen, onClose, title, children, footer }) {
+  if (!isOpen) return null;
+  
+  return createPortal(
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-900 bg-opacity-50 dark:bg-opacity-80 flex items-center justify-center">
+      <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 m-4 max-w-md w-full">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-white">{title}</h3>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+        
+        {/* Body */}
+        <div className="mb-6">{children}</div>
+        
+        {/* Footer */}
+        {footer && <div className="mt-4">{footer}</div>}
+      </div>
+    </div>,
+    document.body
+  );
+}
 
 function VerRespuestas() {
   const { allForms, loadForm, deleteForm, deleteAllForms } = useFormData();
@@ -43,12 +74,10 @@ function VerRespuestas() {
 
   const navigate = useNavigate();
 
-  // Cerrar automáticamente el modal si ya no hay formularios
+  // Resetear página cuando cambien los filtros
   useEffect(() => {
-    if (showDeleteAllModal && allForms.length === 0) {
-      setShowDeleteAllModal(false);
-    }
-  }, [allForms, showDeleteAllModal]);
+    setCurrentPage(1);
+  }, [searchTerm, filterType]);
 
   // Filtrar formularios según criterios
   const filteredForms = allForms.filter(form => {
@@ -121,7 +150,13 @@ function VerRespuestas() {
 
   // Acciones de formularios
   const handleView = (id) => navigate(`/respuestas/${id}`);
-  const handleEdit = (id) => loadForm(id) && navigate('/');
+  
+  const handleEdit = (id) => {
+    if (loadForm(id)) {
+      navigate('/');
+    }
+  };
+  
   const confirmDelete = (id) => {
     setFormToDelete(id);
     setShowDeleteModal(true);
@@ -133,6 +168,11 @@ function VerRespuestas() {
       setShowDeleteModal(false);
       setFormToDelete(null);
     }
+  };
+
+  const handleDeleteAll = () => {
+    deleteAllForms();
+    setShowDeleteAllModal(false);
   };
 
   // Formatear fecha
@@ -164,6 +204,15 @@ function VerRespuestas() {
     return colors[hash % colors.length];
   };
 
+  // Resetear filtros
+  const resetFilters = () => {
+    setSearchTerm('');
+    setFilterType('all');
+    setSortField('fecha');
+    setSortDirection('desc');
+    setCurrentPage(1);
+  };
+
   return (
     <motion.div
       className="max-w-6xl mx-auto"
@@ -190,10 +239,7 @@ function VerRespuestas() {
             <TextInput
               type="search"
               value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setCurrentPage(1);
-              }}
+              onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Buscar por nombre, apellido o DNI..."
               className="pl-10"
             />
@@ -204,10 +250,7 @@ function VerRespuestas() {
             <Select
               id="filterType"
               value={filterType}
-              onChange={(e) => {
-                setFilterType(e.target.value);
-                setCurrentPage(1);
-              }}
+              onChange={(e) => setFilterType(e.target.value)}
               className="w-44"
             >
               <option value="all">Todos los tipos</option>
@@ -220,13 +263,7 @@ function VerRespuestas() {
             <Button
               color="light"
               size="sm"
-              onClick={() => {
-                setSearchTerm('');
-                setFilterType('all');
-                setSortField('fecha');
-                setSortDirection('desc');
-                setCurrentPage(1);
-              }}
+              onClick={resetFilters}
               title="Limpiar filtros"
             >
               <HiFilter className="mr-2 h-4 w-4" />
@@ -502,91 +539,47 @@ function VerRespuestas() {
         )}
       </Card>
 
-      {/* Modal para confirmar eliminación de un formulario */}
-      <Modal
-        show={showDeleteModal}
+      {/* Modales personalizados */}
+      <CustomModal
+        isOpen={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}
-        popup
-        size="md"
-      >
-        <Modal.Header />
-        <Modal.Body>
-          <div className="text-center">
-            <HiExclamation className="mx-auto mb-4 h-14 w-14 text-gray-400 dark:text-gray-200" />
-            <h3 className="mb-5 text-lg font-normal text-gray-500 dark:text-gray-400">
-              ¿Está seguro de que desea eliminar este formulario?
-            </h3>
-            <div className="flex justify-center gap-4">
-              <Button
-                color="failure"
-                onClick={handleDelete}
-              >
-                Sí, eliminar
-              </Button>
-              <Button
-                color="gray"
-                onClick={() => setShowDeleteModal(false)}
-              >
-                No, cancelar
-              </Button>
-            </div>
+        title="Eliminar formulario"
+        footer={
+          <div className="flex justify-end gap-3">
+            <Button color="gray" onClick={() => setShowDeleteModal(false)}>
+              Cancelar
+            </Button>
+            <Button color="failure" onClick={handleDelete}>
+              Sí, eliminar
+            </Button>
           </div>
-        </Modal.Body>
-      </Modal>
-
-      {/* Modal para confirmar eliminación de todos los formularios */}
-
-      {/* Modal para confirmar eliminación de todos los formularios */}
-      <Modal
-        show={showDeleteAllModal}
+        }
+      >
+        <p className="text-gray-600 dark:text-gray-300">
+          ¿Está seguro de que desea eliminar este formulario?
+        </p>
+      </CustomModal>
+      
+      <CustomModal
+        isOpen={showDeleteAllModal}
         onClose={() => setShowDeleteAllModal(false)}
-        size="md"
+        title="Eliminar todos los formularios"
+        footer={
+          <div className="flex justify-end gap-3">
+            <Button color="gray" onClick={() => setShowDeleteAllModal(false)}>
+              Cancelar
+            </Button>
+            <Button color="failure" onClick={handleDeleteAll}>
+              Sí, eliminar todos
+            </Button>
+          </div>
+        }
       >
-        <div className="bg-white dark:bg-gray-800 rounded-lg overflow-hidden shadow-xl">
-          <div className="bg-red-50 dark:bg-red-900/30 p-4 border-b border-red-100 dark:border-red-800/50 flex items-center">
-            <HiExclamation className="h-8 w-8 text-red-500 dark:text-red-400" />
-            <h3 className="ml-3 text-lg font-semibold text-gray-800 dark:text-gray-100">
-              Eliminar todos los formularios
-            </h3>
-            <button
-              onClick={() => setShowDeleteAllModal(false)}
-              className="ml-auto text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-              aria-label="Cerrar"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
-              </svg>
-            </button>
-          </div>
-
-          <div className="p-6">
-            <p className="text-gray-700 dark:text-gray-300 text-base">
-              ¿Está seguro de que desea eliminar <span className="font-bold">TODOS</span> los
-              formularios guardados? Esta acción no se puede deshacer.
-            </p>
-
-            <div className="mt-6 flex justify-end gap-3">
-              <Button
-                color="gray"
-                onClick={() => setShowDeleteAllModal(false)}
-                className="px-4"
-              >
-                Cancelar
-              </Button>
-              <Button
-                color="gray"
-                onClick={() => {
-                  deleteAllForms();
-                  setShowDeleteAllModal(false);
-                }}
-                className="px-4"
-              >
-                Sí, eliminar todos
-              </Button>
-            </div>
-          </div>
-        </div>
-      </Modal>
+        <p className="text-gray-700 dark:text-gray-300">
+          ¿Está seguro de que desea eliminar <span className="font-bold">TODOS</span> los
+          formularios guardados? Esta acción no se puede deshacer.
+        </p>
+      </CustomModal>
     </motion.div>
   );
 }
